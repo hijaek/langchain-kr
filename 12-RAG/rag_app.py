@@ -128,7 +128,9 @@ def get_vectorstore(text_chunks, openai_api_key):
 
     embeddings = OpenAIEmbeddings(
         model_name="text-embedding-3-small",
-        openai_api_key=openai_api_key
+        openai_api_key=openai_api_key,
+        openai_api_base="https://api.openai.com/v1",
+        openai_api_type="openai"  
     )
 
     vectordb = FAISS.from_texts(

@@ -11,3 +11,4 @@ pypdf
 loguru
 docx2txt
 streamlit
+pymupdf

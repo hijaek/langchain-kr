@@ -1,5 +1,6 @@
 pysqlite3-binary
 langchain
+langchain-community
 chromadb
 unstructured
 sentence-transformers
@@ -9,3 +10,4 @@ openai
 pypdf
 loguru
 docx2txt
+streamlit

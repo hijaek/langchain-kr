@@ -5,8 +5,8 @@ from loguru import logger
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
-from langchain.callbacks import get_openai_callback
 
+from langchain_community.callbacks import get_openai_callback
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, UnstructuredPowerPointLoader
 from langchain_community.chat_models import ChatOpenAI
 from langchain_community.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
@@ -140,7 +140,7 @@ def get_conversation_chain(vetorestore,openai_api_key):
     conversation_chain = ConversationalRetrievalChain.from_llm(
             llm=llm, 
             chain_type="stuff", 
-            retriever=vetorestore.as_retriever(search_type = 'mmr', vervose = True), 
+            retriever=vetorestore.as_retriever(search_type = 'mmr', verbose = True), 
             memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True, output_key='answer'),
             get_chat_history=lambda h: h,
             return_source_documents=True,

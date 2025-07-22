@@ -29,16 +29,16 @@ def main():
         openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
         process = st.button("📄 문서 처리")
 
-        # ✅ API 키 테스트 버튼
+        # ✅ 최신 OpenAI 방식으로 임베딩 API 테스트
         if st.button("🔍 API 키 테스트"):
-            import openai
             try:
-                openai.api_key = openai_api_key
-                resp = openai.Embedding.create(
+                from openai import OpenAI
+                client = OpenAI(api_key=openai_api_key)
+                resp = client.embeddings.create(
                     model="text-embedding-3-small",
-                    input=["테스트 문장"]
+                    input=["테스트 문장입니다"]
                 )
-                st.success("✅ API 호출 성공! 임베딩 OK")
+                st.success("✅ 임베딩 호출 성공! 키 유효함")
             except Exception as e:
                 st.error(f"❌ API 호출 실패: {e}")
 

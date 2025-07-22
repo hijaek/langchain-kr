@@ -5,7 +5,6 @@ from loguru import logger
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationBufferMemory
-from langchain.vectorstores import FAISS
 from langchain.chains import ConversationalRetrievalChain
 
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, UnstructuredPowerPointLoader

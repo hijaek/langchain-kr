@@ -137,16 +137,20 @@ def get_text_chunks(text):
 
 
 def get_vectorstore(text_chunks):
-    embeddings = HuggingFaceEmbeddings(
-                                        model_name="jhgan/ko-sroberta-multitask",
-                                        model_kwargs={'device': 'cpu'},
-                                        encode_kwargs={'normalize_embeddings': True}
-                                        )  
-    vectordb = FAISS.from_documents(text_chunks, embeddings)
+    # embeddings = HuggingFaceEmbeddings(
+    #                                     model_name="jhgan/ko-sroberta-multitask",
+    #                                     model_kwargs={'device': 'cpu'},
+    #                                     encode_kwargs={'normalize_embeddings': True}
+                                        # )  
+    embeddings = OpenAIEmbeddings(model = "text-embedding-3-large")
+    vectordb = FAISS.from_documents(
+        documents=text_chunks,
+        embedding=embeddings)
+
     return vectordb
 
 def get_conversation_chain(vetorestore,openai_api_key):
-    llm = ChatOpenAI(openai_api_key=openai_api_key, model_name = 'gpt-3.5-turbo',temperature=0)
+    llm = ChatOpenAI(openai_api_key=openai_api_key, model_name = "gpt-4.1-2025-04-14",temperature=0)
     conversation_chain = ConversationalRetrievalChain.from_llm(
             llm=llm, 
             chain_type="stuff", 

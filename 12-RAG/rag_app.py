@@ -6,6 +6,7 @@ import openai  # openai==0.28.1 버전에 맞춤
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
+from langchain.retrievers.multi_query import MultiQueryRetriever
 
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, UnstructuredPowerPointLoader
 from langchain_community.chat_models import ChatOpenAI
@@ -144,15 +145,27 @@ def get_conversation_chain(vetorestore, openai_api_key):
         model_name="gpt-4.1-2025-04-14",
         temperature=0
     )
-    return ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        chain_type="stuff",
-        retriever=vetorestore.as_retriever(search_type='mmr', verbose=True),
-        memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True, output_key='answer'),
-        get_chat_history=lambda h: h,
-        return_source_documents=True,
-        verbose=True
+    
+    retriever_from_llm = MultiQueryRetriever.from_llm(
+        retriever=vectorstore.as_retriever(), llm=llm
     )
+
+    chain = (
+    {"context": retriever_from_llm, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)   
+    
+    # return ConversationalRetrievalChain.from_llm(
+    #     llm=llm,
+    #     chain_type="stuff",
+    #     retriever=vetorestore.as_retriever(search_type='mmr', verbose=True),
+    #     memory=ConversationBufferMemory(memory_key='chat_history', return_messages=True, output_key='answer'),
+    #     get_chat_history=lambda h: h,
+    #     return_source_documents=True,
+    #     verbose=True
+    # )
 
 
 if __name__ == '__main__':

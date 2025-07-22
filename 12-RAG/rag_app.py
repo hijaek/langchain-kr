@@ -128,7 +128,8 @@ def get_vectorstore(text_chunks):
     #                                     model_kwargs={'device': 'cpu'},
     #                                     encode_kwargs={'normalize_embeddings': True}
                                         # )  
-    embeddings = OpenAIEmbeddings(model = "text-embedding-3-large")
+    embeddings = OpenAIEmbeddings(model_name = "text-embedding-3-large",  openai_api_key=st.session_state.get("chatbot_api_key")
+)
     vectordb = FAISS.from_documents(
         documents=text_chunks,
         embedding=embeddings)

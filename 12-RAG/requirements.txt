@@ -4,3 +4,10 @@ langchain-community==0.0.20
 openai==0.28.1
 tiktoken
 faiss-cpu
+
+pymupdf  # PyMuPDFLoader
+docx2txt
+unstructured
+python-pptx
+
+loguru

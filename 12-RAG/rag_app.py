@@ -1,6 +1,7 @@
 import streamlit as st
 import tiktoken
 from loguru import logger
+import openai  # openai==0.28.1 버전에 맞춤
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationBufferMemory
@@ -29,12 +30,10 @@ def main():
         openai_api_key = st.text_input("OpenAI API Key", key="chatbot_api_key", type="password")
         process = st.button("📄 문서 처리")
 
-        # ✅ 최신 OpenAI 방식으로 임베딩 API 테스트
         if st.button("🔍 API 키 테스트"):
             try:
-                from openai import OpenAI
-                client = OpenAI(api_key=openai_api_key)
-                resp = client.embeddings.create(
+                openai.api_key = openai_api_key
+                resp = openai.Embedding.create(
                     model="text-embedding-3-small",
                     input=["테스트 문장입니다"]
                 )
@@ -54,7 +53,7 @@ def main():
         st.session_state.processComplete = True
 
     if 'messages' not in st.session_state:
-        st.session_state['messages'] = [{"role": "assistant", 
+        st.session_state['messages'] = [{"role": "assistant",
                                          "content": "안녕하세요! 주어진 문서에 대해 궁금하신 것이 있으면 언제든 물어봐주세요!"}]
 
     for message in st.session_state.messages:
@@ -128,9 +127,7 @@ def get_vectorstore(text_chunks, openai_api_key):
 
     embeddings = OpenAIEmbeddings(
         model_name="text-embedding-3-small",
-        openai_api_key=openai_api_key,
-        openai_api_base="https://api.openai.com/v1",
-        openai_api_type="openai"  
+        openai_api_key=openai_api_key
     )
 
     vectordb = FAISS.from_texts(

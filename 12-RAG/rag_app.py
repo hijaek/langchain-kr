@@ -74,7 +74,7 @@ def main():
         with st.chat_message("assistant"):
             chain = st.session_state.conversation
             with st.spinner("Thinking..."):
-                result = chain({"question": query})
+                result = chain.invoke({"question": query})
                 st.session_state.chat_history = result['chat_history']
                 response = result['answer']
                 source_documents = result['source_documents']

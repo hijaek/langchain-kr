@@ -7,7 +7,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 
 from langchain_community.callbacks import get_openai_callback
-from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, UnstructuredPowerPointLoader
+from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, UnstructuredPowerPointLoader
 from langchain_community.chat_models import ChatOpenAI
 from langchain_community.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
@@ -99,8 +99,8 @@ def get_text(docs):
             file.write(doc.getvalue())
             logger.info(f"Uploaded {file_name}")
         if '.pdf' in doc.name:
-            loader = PyPDFLoader(file_name)
-            documents = loader.load_and_split()
+            loader = PyMuPDFLoader(file_name)
+            documents = loader.load()
         elif '.docx' in doc.name:
             loader = Docx2txtLoader(file_name)
             documents = loader.load_and_split()
@@ -114,12 +114,13 @@ def get_text(docs):
 
 def get_text_chunks(text):
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=900,
-        chunk_overlap=100,
+        chunk_size=2000,
+        chunk_overlap=200,
         length_function=tiktoken_len
     )
     chunks = text_splitter.split_documents(text)
     return chunks
+
 
 
 def get_vectorstore(text_chunks):
@@ -128,11 +129,13 @@ def get_vectorstore(text_chunks):
     #                                     model_kwargs={'device': 'cpu'},
     #                                     encode_kwargs={'normalize_embeddings': True}
                                         # )  
-    embeddings = OpenAIEmbeddings(model_name = "text-embedding-3-large",  openai_api_key=st.session_state.get("chatbot_api_key")
+    embeddings = OpenAIEmbeddings(model_name = "text-embedding-3-large",
+                                  openai_api_key=st.session_state.get("chatbot_api_key")
 )
     vectordb = FAISS.from_documents(
         documents=text_chunks,
         embedding=embeddings)
+
 
     return vectordb
 

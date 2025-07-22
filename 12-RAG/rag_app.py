@@ -121,9 +121,12 @@ def get_text_chunks(text):
     chunks = text_splitter.split_documents(text)
     return chunks
 
-
+def clean_chunks(chunks):
+    return [doc for doc in chunks if doc.page_content and doc.page_content.strip()]
 
 def get_vectorstore(text_chunks, openai_api_key):
+    cleaned_chunks = [doc for doc in text_chunks if doc.page_content.strip() != ""]
+
     embeddings = OpenAIEmbeddings(
         model_name="text-embedding-3-large",
         openai_api_key=openai_api_key

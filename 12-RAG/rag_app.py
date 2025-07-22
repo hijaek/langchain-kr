@@ -6,7 +6,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 
-from langchain_community.callbacks import get_openai_callback
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, UnstructuredPowerPointLoader
 from langchain_community.chat_models import ChatOpenAI
 from langchain_community.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
@@ -68,8 +67,7 @@ def main():
 
             with st.spinner("Thinking..."):
                 result = chain({"question": query})
-                with get_openai_callback() as cb:
-                    st.session_state.chat_history = result['chat_history']
+                st.session_state.chat_history = result['chat_history']
                 response = result['answer']
                 source_documents = result['source_documents']
 
@@ -131,11 +129,18 @@ def get_vectorstore(text_chunks, openai_api_key):
         model_name="text-embedding-3-large",
         openai_api_key=openai_api_key
     )
-    vectordb = FAISS.from_documents(
-        documents=text_chunks,
-        embedding=embeddings
+
+    texts = [doc.page_content for doc in cleaned_chunks]
+    metadatas = [doc.metadata for doc in cleaned_chunks]
+
+    vectordb = FAISS.from_texts(
+        texts=texts,
+        embedding=embeddings,
+        metadatas=metadatas
     )
+
     return vectordb
+
 
 
 def get_conversation_chain(vetorestore,openai_api_key):

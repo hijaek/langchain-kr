@@ -1,13 +1,14 @@
-streamlit==1.32.2
+pysqlite3-binary
 langchain==0.1.16
 langchain-community==0.0.20
-openai==0.28.1
-tiktoken
-faiss-cpu
-
-pymupdf  # PyMuPDFLoader
-docx2txt
+chromadb
 unstructured
-python-pptx
-
+sentence-transformers
+faiss-cpu
+tiktoken
+openai==0.28.1
+pypdf
 loguru
+docx2txt
+streamlit
+pymupdf

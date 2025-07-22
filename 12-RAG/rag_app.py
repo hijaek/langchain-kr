@@ -1,26 +1,19 @@
 import streamlit as st
 import tiktoken
+
 from loguru import logger
-
-from langchain_community.chains import ConversationalRetrievalChain
-
-from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders import Docx2txtLoader
-from langchain.document_loaders import UnstructuredPowerPointLoader
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationBufferMemory
 from langchain.vectorstores import FAISS
+from langchain.chains import ConversationalRetrievalChain
 
-
-from langchain_community.chat_models import ChatOpenAI
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, UnstructuredPowerPointLoader
+from langchain_community.chat_models import ChatOpenAI
 from langchain_community.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.callbacks.manager import get_openai_callback
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
-from langchain_community.embeddings import OpenAIEmbeddings
-
 
 # from streamlit_chat import message
 from langchain.callbacks import get_openai_callback

@@ -14,6 +14,10 @@ from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
 
+from langchain.schema import StrOutputParser
+from langchain.schema.runnable import RunnablePassthrough
+from langchain.prompts import PromptTemplate
+
 
 def main():
     st.set_page_config(page_title="DirChat", page_icon="📚")
@@ -139,24 +143,43 @@ def get_vectorstore(text_chunks, openai_api_key):
     return vectordb
 
 
-def get_conversation_chain(vetorestore, openai_api_key):
+def get_conversation_chain(vectorstore, openai_api_key):
     llm = ChatOpenAI(
         openai_api_key=openai_api_key,
         model_name="gpt-4.1-2025-04-14",
         temperature=0
     )
-    
+
     retriever_from_llm = MultiQueryRetriever.from_llm(
-        retriever=vectorstore.as_retriever(), llm=llm
+        retriever=vectorstore.as_retriever(),
+        llm=llm
+    )
+
+    prompt = PromptTemplate.from_template(
+        """당신은 질문-답변(Question-Answering)을 수행하는 친절한 AI 어시스턴트입니다. 당신의 임무는 주어진 문맥(context) 에서 주어진 질문(question) 에 답하는 것입니다.
+    우선적으로 검색된 다음 문맥(context) 만을 사용하여 질문(question) 에 답하세요. 문서에 직접적인 설명이없더라도, 문맥상으로 유추를 해보고 생각을 곁들여도 괜찮아. 그리고도 답을 모른다면 '잘 모르겠습니다' 라고 답하세요.
+    한글로 답변해 주세요. 단, 기술적인 용어나 이름은 번역하지 않고 그대로 사용해 주세요.
+
+    그리고, 당신은 당신의 지능에 대한 신뢰성을 보여주기위해, 문맥에 의지하는것처럼 보이는건 피해야합니다. '문맥상...'으로 문장을 시작하면 당신이 당신의 대답에 대해 책임을 회피하려는것처럼 보이므로 이를 피해야합니다.
+
+    #Context:
+    {context}
+
+    #Question:
+    {question}
+
+    #Answer:"""
     )
 
     chain = (
-    {"context": retriever_from_llm, "question": RunnablePassthrough()}
-    | prompt
-    | llm
-    | StrOutputParser()
-)   
-    
+        {"context": retriever_from_llm, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+    return chain
+
     # return ConversationalRetrievalChain.from_llm(
     #     llm=llm,
     #     chain_type="stuff",

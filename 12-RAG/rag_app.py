@@ -6,6 +6,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 
+
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, UnstructuredPowerPointLoader
 from langchain_community.chat_models import ChatOpenAI
 from langchain_community.embeddings import HuggingFaceEmbeddings, OpenAIEmbeddings
@@ -126,7 +127,7 @@ def get_vectorstore(text_chunks, openai_api_key):
     cleaned_chunks = [doc for doc in text_chunks if doc.page_content.strip() != ""]
 
     embeddings = OpenAIEmbeddings(
-        model_name="text-embedding-3-large",
+        model_name="text-embedding-3-small",
         openai_api_key=openai_api_key
     )
 

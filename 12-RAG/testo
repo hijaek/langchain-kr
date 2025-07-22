@@ -1,0 +1,11 @@
+
+
+import openai
+
+openai.api_key = openai_api_key
+
+resp = openai.Embedding.create(
+    input=["임베딩 테스트"],
+    model="text-embedding-3-large"
+)
+print(resp)

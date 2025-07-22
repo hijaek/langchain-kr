@@ -40,7 +40,7 @@ def main():
             st.stop()
         files_text = get_text(uploaded_files)
         text_chunks = get_text_chunks(files_text)
-        vetorestore = get_vectorstore(text_chunks)
+        vetorestore = get_vectorstore(text_chunks, openai_api_key)
      
         st.session_state.conversation = get_conversation_chain(vetorestore,openai_api_key) 
 
@@ -123,21 +123,17 @@ def get_text_chunks(text):
 
 
 
-def get_vectorstore(text_chunks):
-    # embeddings = HuggingFaceEmbeddings(
-    #                                     model_name="jhgan/ko-sroberta-multitask",
-    #                                     model_kwargs={'device': 'cpu'},
-    #                                     encode_kwargs={'normalize_embeddings': True}
-                                        # )  
-    embeddings = OpenAIEmbeddings(model_name = "text-embedding-3-large",
-                                  openai_api_key=st.session_state.get("chatbot_api_key")
-)
+def get_vectorstore(text_chunks, openai_api_key):
+    embeddings = OpenAIEmbeddings(
+        model_name="text-embedding-3-large",
+        openai_api_key=openai_api_key
+    )
     vectordb = FAISS.from_documents(
         documents=text_chunks,
-        embedding=embeddings)
-
-
+        embedding=embeddings
+    )
     return vectordb
+
 
 def get_conversation_chain(vetorestore,openai_api_key):
     llm = ChatOpenAI(openai_api_key=openai_api_key, model_name = "gpt-4.1-2025-04-14",temperature=0)

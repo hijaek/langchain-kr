@@ -28,6 +28,8 @@ def main():
         )
         openai_api_key = st.text_input("🔑 OpenAI API Key", type="password")
 
+        process = st.button("📄 문서 처리")
+    
         st.markdown("### ⚙️ 임베딩 / 청크 설정")
         max_chunks = st.number_input(
             "🔢 임베딩할 최대 청크 수 (개)",
@@ -72,7 +74,6 @@ def main():
             help="배치 간 잠깐 쉬어 OpenAI 레이트리밋을 피합니다.",
         )
 
-        process = st.button("📄 문서 처리")
 
         if st.button("🔍 API 키 테스트"):
             try:
@@ -178,7 +179,7 @@ def get_text(docs):
     return doc_list
 
 
-def get_text_chunks(chunk_size=800, chunk_overlap=120):
+def get_text_chunks(docs, chunk_size=800, chunk_overlap=120):
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,

@@ -201,7 +201,7 @@ def get_vectorstore(text_chunks, api_key):
     PAUSE_BETWEEN_BATCHES = 1.5  # seconds
 
     embeddings = OpenAIEmbeddings(
-        model_name="text-embedding-3-small",
+        model_name="text-embedding-3-large",
         openai_api_key=api_key
     )
 

@@ -1,8 +1,8 @@
 import streamlit as st
 import tiktoken
-
 import openai
 import time
+import math
 
 from loguru import logger
 from openai.error import RateLimitError
@@ -84,7 +84,7 @@ def main():
                 # v0.28.x 스타일 (현재 코드와 동일 계열)
                 openai.api_key = openai_api_key
                 _ = openai.Embedding.create(
-                    model="text-embedding-3-small", input=["테스트 문장"]
+                    model="text-embedding-3-large", input=["테스트 문장"]
                 )
                 st.success("✅ API 키 정상입니다!")
             except Exception as e:
@@ -191,48 +191,92 @@ def get_text_chunks(docs, chunk_size=800, chunk_overlap=120):
 
 
 def get_vectorstore(text_chunks, api_key):
+    """
+    Build FAISS index in small batches with live ETA.
+    - Shows a Streamlit progress bar with remaining time.
+    - Handles OpenAI rate limits via backoff.
+    """
+    # You can tune these without changing any other code:
+    BATCH_SIZE = 64
+    PAUSE_BETWEEN_BATCHES = 1.5  # seconds
+
     embeddings = OpenAIEmbeddings(
         model_name="text-embedding-3-small",
         openai_api_key=api_key
     )
+
     texts = [doc.page_content for doc in text_chunks]
     metadatas = [doc.metadata for doc in text_chunks]
+    total = len(texts)
+    if total == 0:
+        return FAISS.from_texts(texts=[], embedding=embeddings, metadatas=[])
 
-    # 배치 처리 + 레이트리밋 백오프 (이 함수만 수정)
-    batch_size = 64
-    sleep_s = 2.0
+    # Helpers
+    def _fmt_eta(sec: float) -> str:
+        sec = max(0, int(sec))
+        m, s = divmod(sec, 60)
+        h, m = divmod(m, 60)
+        return f"{h:d}:{m:02d}:{s:02d}" if h else f"{m:d}:{s:02d}"
+
+    progress = st.progress(0.0, text=f"임베딩/인덱싱 시작... (0/{total})")
+    start_t = time.perf_counter()
+
     vs = None
     i = 0
+    ema_per_item = None        # exponential moving average of seconds per item
+    alpha = 0.25               # smoothing factor
 
-    while i < len(texts):
-        j = min(i + batch_size, len(texts))
+    while i < total:
+        j = min(i + BATCH_SIZE, total)
         batch_texts = texts[i:j]
         batch_metas = metadatas[i:j]
 
-        try:
-            if vs is None:
-                # 첫 배치에서 인덱스 생성
-                vs = FAISS.from_texts(
-                    texts=batch_texts,
-                    embedding=embeddings,
-                    metadatas=batch_metas
-                )
-            else:
-                # 이후 배치는 추가
-                vs.add_texts(
-                    texts=batch_texts,
-                    metadatas=batch_metas
-                )
+        batch_start = time.perf_counter()
+        backoff = 2.0
 
-            i = j  # 성공 시 다음 배치로 이동
-            if i < len(texts):
-                time.sleep(1.5)  # 과도한 연속 호출 방지 (소폭 대기)
+        while True:
+            try:
+                if vs is None:
+                    vs = FAISS.from_texts(
+                        texts=batch_texts,
+                        embedding=embeddings,
+                        metadatas=batch_metas
+                    )
+                else:
+                    vs.add_texts(texts=batch_texts, metadatas=batch_metas)
+                break
+            except RateLimitError:
+                time.sleep(backoff)
+                backoff = min(30.0, backoff * 1.8)
 
-        except RateLimitError:
-            # 레이트리밋 발생 시 지수 백오프 후 같은 배치 재시도
-            time.sleep(sleep_s)
-            sleep_s = min(30.0, sleep_s * 1.8)
+        # Optional gentle pacing between batches
+        if j < total:
+            time.sleep(PAUSE_BETWEEN_BATCHES)
 
+        # Update timing stats
+        batch_time = time.perf_counter() - batch_start
+        items = j - i
+        per_item = batch_time / max(1, items)
+        ema_per_item = per_item if ema_per_item is None else (
+            alpha * per_item + (1 - alpha) * ema_per_item
+        )
+
+        done = j
+        remaining = total - done
+        # Add expected sleep cost for remaining batches
+        remaining_batches = math.ceil(remaining / BATCH_SIZE) if BATCH_SIZE else 0
+        eta_sec = (ema_per_item * remaining) + (PAUSE_BETWEEN_BATCHES * remaining_batches)
+
+        frac = done / total
+        progress.progress(
+            frac,
+            text=f"임베딩/인덱싱 진행 중... {done}/{total} · ETA {_fmt_eta(eta_sec)}"
+        )
+
+        i = j
+
+    total_time = time.perf_counter() - start_t
+    progress.progress(1.0, text=f"임베딩/인덱싱 완료! 총 소요 {_fmt_eta(total_time)}")
     return vs
 
     texts = [doc.page_content for doc in text_chunks]
@@ -242,7 +286,7 @@ def get_vectorstore(text_chunks, api_key):
 
 def get_multiquery_chain(vectorstore, api_key):
     llm = ChatOpenAI(
-        model_name="gpt-4o-mini",
+        model_name="gpt-5",
         openai_api_key=api_key,
         temperature=0
     )

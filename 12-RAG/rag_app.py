@@ -310,7 +310,7 @@ def get_vectorstore(text_chunks, api_key, batch_size=32, pause=1.5,
 
 def get_multiquery_chain(vectorstore, api_key):
     llm = ChatOpenAI(
-        model_name="gpt-5",
+        model_name="gpt-4o-mini",
         openai_api_key=api_key,
         temperature=0
     )

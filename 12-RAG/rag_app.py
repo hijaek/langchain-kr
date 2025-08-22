@@ -303,9 +303,9 @@ def get_vectorstore(text_chunks, api_key, batch_size=32, pause=1.5,
     metadatas = [doc.metadata for doc in text_chunks]
     return FAISS.from_texts(texts=texts, embedding=embeddings, metadatas=metadatas)
 
-vectorstore = get_vectorstore(
-    chunks, openai_api_key, batch_size=batch_size, pause=pause_seconds
-)
+# vectorstore = get_vectorstore(
+#     chunks, openai_api_key, batch_size=batch_size, pause=pause_seconds
+# )
 
 
 def get_multiquery_chain(vectorstore, api_key):

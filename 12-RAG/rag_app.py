@@ -114,9 +114,7 @@ def main():
 
         # 2) Build vector store with throttled batching
         with st.spinner("임베딩 및 인덱스 생성 중..."):
-            vectorstore = get_vectorstore(
-                chunks, openai_api_key, batch_size=batch_size, pause=pause_seconds
-            )
+            vectorstore = get_vectorstore(chunks, openai_api_key)
         st.success("✅ 인덱스 생성 완료!")
 
         # 3) Build retriever chain

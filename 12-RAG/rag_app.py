@@ -178,13 +178,13 @@ def get_text(docs):
     return doc_list
 
 
-def get_text_chunks(docs: List, chunk_size=800, chunk_overlap=120) -> List:
+def get_text_chunks(chunk_size=800, chunk_overlap=120):
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         length_function=tiktoken_len,
     )
-    return [d for d in splitter.split_documents(docs) if d.page_content.strip()]
+    return [doc for doc in splitter.split_documents(docs) if doc.page_content.strip()]
 
 
 def get_vectorstore(text_chunks, api_key):

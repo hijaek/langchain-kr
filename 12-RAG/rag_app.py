@@ -1,7 +1,11 @@
 import streamlit as st
 import tiktoken
-from loguru import logger
+
 import openai
+import time
+
+from loguru import logger
+from openai.error import RateLimitError
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.memory import ConversationBufferMemory
@@ -191,6 +195,46 @@ def get_vectorstore(text_chunks, api_key):
         model_name="text-embedding-3-small",
         openai_api_key=api_key
     )
+    texts = [doc.page_content for doc in text_chunks]
+    metadatas = [doc.metadata for doc in text_chunks]
+
+    # 배치 처리 + 레이트리밋 백오프 (이 함수만 수정)
+    batch_size = 64
+    sleep_s = 2.0
+    vs = None
+    i = 0
+
+    while i < len(texts):
+        j = min(i + batch_size, len(texts))
+        batch_texts = texts[i:j]
+        batch_metas = metadatas[i:j]
+
+        try:
+            if vs is None:
+                # 첫 배치에서 인덱스 생성
+                vs = FAISS.from_texts(
+                    texts=batch_texts,
+                    embedding=embeddings,
+                    metadatas=batch_metas
+                )
+            else:
+                # 이후 배치는 추가
+                vs.add_texts(
+                    texts=batch_texts,
+                    metadatas=batch_metas
+                )
+
+            i = j  # 성공 시 다음 배치로 이동
+            if i < len(texts):
+                time.sleep(1.5)  # 과도한 연속 호출 방지 (소폭 대기)
+
+        except RateLimitError:
+            # 레이트리밋 발생 시 지수 백오프 후 같은 배치 재시도
+            time.sleep(sleep_s)
+            sleep_s = min(30.0, sleep_s * 1.8)
+
+    return vs
+
     texts = [doc.page_content for doc in text_chunks]
     metadatas = [doc.metadata for doc in text_chunks]
     return FAISS.from_texts(texts=texts, embedding=embeddings, metadatas=metadatas)

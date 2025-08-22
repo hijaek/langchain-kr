@@ -23,16 +23,63 @@ def main():
     st.title("_MultiQuery 기반 :red[문서 QA]_ 📚")
 
     with st.sidebar:
-        uploaded_files = st.file_uploader("📎 문서를 업로드하세요", type=['pdf', 'docx'], accept_multiple_files=True)
+        uploaded_files = st.file_uploader(
+            "📎 문서를 업로드하세요", type=["pdf", "docx", "pptx"], accept_multiple_files=True
+        )
         openai_api_key = st.text_input("🔑 OpenAI API Key", type="password")
+
+        st.markdown("### ⚙️ 임베딩 / 청크 설정")
+        max_chunks = st.number_input(
+            "🔢 임베딩할 최대 청크 수 (개)",
+            min_value=50,
+            max_value=20000,
+            value=800,
+            step=50,
+            help="업로드한 문서에서 생성된 청크 중 상위 N개만 임베딩합니다.",
+        )
+        chunk_size_ui = st.number_input(
+            "🧩 청크 크기 (토큰 근사)",
+            min_value=200,
+            max_value=3000,
+            value=800,
+            step=50,
+            help="청크가 작을수록 임베딩 당 토큰 수가 줄어듭니다.",
+        )
+        chunk_overlap_ui = st.number_input(
+            "🔁 청크 오버랩",
+            min_value=0,
+            max_value=1000,
+            value=120,
+            step=10,
+            help="인접 청크 간 중복 토큰 수.",
+        )
+
+        st.markdown("### 🐢 레이트리밋 내성")
+        batch_size = st.number_input(
+            "📦 임베딩 배치 크기",
+            min_value=8,
+            max_value=512,
+            value=64,
+            step=8,
+            help="이 배치 단위로 OpenAI Embeddings API를 호출합니다.",
+        )
+        pause_seconds = st.number_input(
+            "⏱️ 배치 간 대기 (초)",
+            min_value=0.0,
+            max_value=10.0,
+            value=1.5,
+            step=0.5,
+            help="배치 간 잠깐 쉬어 OpenAI 레이트리밋을 피합니다.",
+        )
+
         process = st.button("📄 문서 처리")
 
         if st.button("🔍 API 키 테스트"):
             try:
+                # v0.28.x 스타일 (현재 코드와 동일 계열)
                 openai.api_key = openai_api_key
-                resp = openai.Embedding.create(
-                    model="text-embedding-3-small",
-                    input=["테스트 문장"]
+                _ = openai.Embedding.create(
+                    model="text-embedding-3-small", input=["테스트 문장"]
                 )
                 st.success("✅ API 키 정상입니다!")
             except Exception as e:
@@ -43,13 +90,40 @@ def main():
             st.warning("API 키를 입력해주세요.")
             st.stop()
 
+        if not uploaded_files:
+            st.warning("하나 이상의 문서를 업로드하세요.")
+            st.stop()
+
+        # 1) Load & split documents
         docs = get_text(uploaded_files)
-        chunks = get_text_chunks(docs)
-        vectorstore = get_vectorstore(chunks, openai_api_key)
+        if not docs:
+            st.error("문서를 읽지 못했습니다. 지원 형식을 확인해주세요.")
+            st.stop()
+
+        chunks = get_text_chunks(
+            docs, chunk_size=chunk_size_ui, chunk_overlap=chunk_overlap_ui
+        )
+        if not chunks:
+            st.error("추출된 텍스트가 없습니다.")
+            st.stop()
+
+        if len(chunks) > max_chunks:
+            chunks = chunks[: int(max_chunks)]
+            st.info(f"총 청크가 많아 상위 {len(chunks)}개만 임베딩합니다.")
+
+        # 2) Build vector store with throttled batching
+        with st.spinner("임베딩 및 인덱스 생성 중..."):
+            vectorstore = get_vectorstore(
+                chunks, openai_api_key, batch_size=batch_size, pause=pause_seconds
+            )
+        st.success("✅ 인덱스 생성 완료!")
+
+        # 3) Build retriever chain
         chain = get_multiquery_chain(vectorstore, openai_api_key)
         st.session_state.conversation = chain
         st.session_state.chat_history = []
 
+    # Chat UI
     if "conversation" in st.session_state:
         for msg in st.session_state.chat_history:
             with st.chat_message("user"):
@@ -63,13 +137,19 @@ def main():
 
             with st.chat_message("assistant"):
                 with st.spinner("답변 생성 중..."):
-                    response = st.session_state.conversation.invoke({"question": query})
+                    try:
+                        response = st.session_state.conversation.invoke(
+                            {"question": query}
+                        )
+                    except Exception as e:
+                        response = f"오류가 발생했습니다: {e}"
                     st.markdown(response)
 
-                st.session_state.chat_history.append({
-                    "question": query,
-                    "answer": response
-                })
+                st.session_state.chat_history.append(
+                    {"question": query, "answer": response}
+                )
+
+
 
 
 def tiktoken_len(text):

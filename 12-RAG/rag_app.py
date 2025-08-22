@@ -190,98 +190,122 @@ def get_text_chunks(docs, chunk_size=800, chunk_overlap=120):
     return [doc for doc in splitter.split_documents(docs) if doc.page_content.strip()]
 
 
-def get_vectorstore(text_chunks, api_key):
+def get_vectorstore(text_chunks, api_key, batch_size=32, pause=1.5,
+                    max_retries_per_batch=8, max_backoff=30.0):
     """
-    Build FAISS index in small batches with live ETA.
-    - Shows a Streamlit progress bar with remaining time.
-    - Handles OpenAI rate limits via backoff.
+    - 배치/백오프로 임베딩 + 진행률/ETA 표시
+    - 비회복성 오류(예: insufficient_quota)는 즉시 표시하고 중단
+    - 첫 배치를 반드시 작게 보내서 0/x 정체 방지
     """
-    # You can tune these without changing any other code:
-    BATCH_SIZE = 64
-    PAUSE_BETWEEN_BATCHES = 1.5  # seconds
+    # OpenAIEmbeddings의 요청당 묶음 크기(내부 마이크로배치)도 작게
+    try:
+        embeddings = OpenAIEmbeddings(
+            model_name="text-embedding-3-small",
+            openai_api_key=api_key,
+            chunk_size=max(1, min(8, batch_size)),  # 너무 크게 묶지 않기
+            max_retries=0,  # 우리 쪽에서 재시도 제어
+            request_timeout=60,
+        )
+    except TypeError:
+        # 일부 버전 호환
+        embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-small",
+            openai_api_key=api_key,
+            chunk_size=max(1, min(8, batch_size)),
+            max_retries=0,
+            request_timeout=60,
+        )
 
-    embeddings = OpenAIEmbeddings(
-        model_name="text-embedding-3-large",
-        openai_api_key=api_key
-    )
-
-    texts = [doc.page_content for doc in text_chunks]
-    metadatas = [doc.metadata for doc in text_chunks]
+    texts = [d.page_content for d in text_chunks]
+    metas = [d.metadata for d in text_chunks]
     total = len(texts)
     if total == 0:
         return FAISS.from_texts(texts=[], embedding=embeddings, metadatas=[])
 
-    # Helpers
-    def _fmt_eta(sec: float) -> str:
+    # ETA 표시 유틸
+    def fmt_eta(sec: float) -> str:
         sec = max(0, int(sec))
-        m, s = divmod(sec, 60)
-        h, m = divmod(m, 60)
+        m, s = divmod(sec, 60); h, m = divmod(m, 60)
         return f"{h:d}:{m:02d}:{s:02d}" if h else f"{m:d}:{s:02d}"
 
     progress = st.progress(0.0, text=f"임베딩/인덱싱 시작... (0/{total})")
+    status = st.empty()
     start_t = time.perf_counter()
+    ema_per_item = None
+    alpha = 0.25
+
+    # 첫 배치는 반드시 아주 작게(예: 1~4개) -> 0에서 멈춤 방지
+    tiny_first_batch = max(1, min(4, batch_size))
 
     vs = None
     i = 0
-    ema_per_item = None        # exponential moving average of seconds per item
-    alpha = 0.25               # smoothing factor
-
     while i < total:
-        j = min(i + BATCH_SIZE, total)
-        batch_texts = texts[i:j]
-        batch_metas = metadatas[i:j]
+        # 첫 루프만 ultra small, 이후부터는 UI batch_size 사용
+        step = tiny_first_batch if i == 0 else batch_size
+        j = min(i + step, total)
+        tbatch = texts[i:j]
+        mbatch = metas[i:j]
 
-        batch_start = time.perf_counter()
+        attempt = 0
         backoff = 2.0
+        batch_start = time.perf_counter()
 
         while True:
             try:
                 if vs is None:
-                    vs = FAISS.from_texts(
-                        texts=batch_texts,
-                        embedding=embeddings,
-                        metadatas=batch_metas
-                    )
+                    vs = FAISS.from_texts(texts=tbatch, embedding=embeddings, metadatas=mbatch)
                 else:
-                    vs.add_texts(texts=batch_texts, metadatas=batch_metas)
-                break
-            except RateLimitError:
-                time.sleep(backoff)
-                backoff = min(30.0, backoff * 1.8)
+                    vs.add_texts(texts=tbatch, metadatas=mbatch)
+                break  # 성공
+            except RateLimitError as e:
+                msg = str(e).lower()
+                # 비회복성(크레딧/쿼터)일 가능성
+                if "insufficient_quota" in msg or "exceeded your current quota" in msg:
+                    status.error("❌ OpenAI 잔액/쿼터 부족으로 임베딩을 진행할 수 없습니다.")
+                    raise
+                attempt += 1
+                if attempt > max_retries_per_batch:
+                    status.error("❌ 레이트리밋 재시도 한도를 초과했습니다. 배치 크기를 줄여주세요.")
+                    raise
+                wait_s = min(max_backoff, backoff)
+                status.write(f"⏳ 레이트리밋 대기 중… {wait_s:.1f}s (재시도 {attempt}/{max_retries_per_batch})")
+                time.sleep(wait_s)
+                backoff *= 1.8
+            except Exception as e:
+                status.error(f"❌ 임베딩 중 오류: {e}")
+                raise
 
-        # Optional gentle pacing between batches
-        if j < total:
-            time.sleep(PAUSE_BETWEEN_BATCHES)
+        # 배치 사이 소폭 대기 (과도한 연속 호출 방지)
+        if j < total and pause > 0:
+            time.sleep(pause)
 
-        # Update timing stats
+        # 진행률/ETA 갱신
         batch_time = time.perf_counter() - batch_start
         items = j - i
         per_item = batch_time / max(1, items)
-        ema_per_item = per_item if ema_per_item is None else (
-            alpha * per_item + (1 - alpha) * ema_per_item
-        )
+        ema_per_item = per_item if ema_per_item is None else (alpha * per_item + (1 - alpha) * ema_per_item)
 
         done = j
         remaining = total - done
-        # Add expected sleep cost for remaining batches
-        remaining_batches = math.ceil(remaining / BATCH_SIZE) if BATCH_SIZE else 0
-        eta_sec = (ema_per_item * remaining) + (PAUSE_BETWEEN_BATCHES * remaining_batches)
+        remaining_batches = math.ceil(remaining / max(1, batch_size))
+        eta_sec = (ema_per_item * remaining) + (pause * remaining_batches)
 
-        frac = done / total
-        progress.progress(
-            frac,
-            text=f"임베딩/인덱싱 진행 중... {done}/{total} · ETA {_fmt_eta(eta_sec)}"
-        )
-
+        progress.progress(done / total, text=f"임베딩/인덱싱 진행 중... {done}/{total} · ETA {fmt_eta(eta_sec)}")
         i = j
 
     total_time = time.perf_counter() - start_t
-    progress.progress(1.0, text=f"임베딩/인덱싱 완료! 총 소요 {_fmt_eta(total_time)}")
+    status.empty()
+    progress.progress(1.0, text=f"임베딩/인덱싱 완료! 총 소요 {fmt_eta(total_time)}")
     return vs
+
 
     texts = [doc.page_content for doc in text_chunks]
     metadatas = [doc.metadata for doc in text_chunks]
     return FAISS.from_texts(texts=texts, embedding=embeddings, metadatas=metadatas)
+
+vectorstore = get_vectorstore(
+    chunks, openai_api_key, batch_size=batch_size, pause=pause_seconds
+)
 
 
 def get_multiquery_chain(vectorstore, api_key):

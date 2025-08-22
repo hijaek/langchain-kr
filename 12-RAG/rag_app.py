@@ -100,8 +100,8 @@ def get_text(docs):
 
 def get_text_chunks(docs):
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
+        chunk_size=800,
+        chunk_overlap=120,
         length_function=tiktoken_len
     )
     return [doc for doc in splitter.split_documents(docs) if doc.page_content.strip()]
@@ -119,7 +119,7 @@ def get_vectorstore(text_chunks, api_key):
 
 def get_multiquery_chain(vectorstore, api_key):
     llm = ChatOpenAI(
-        model_name="gpt-4.1-2025-04-14",
+        model_name="gpt-4o-mini",
         openai_api_key=api_key,
         temperature=0
     )

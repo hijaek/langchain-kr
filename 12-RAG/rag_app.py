@@ -278,9 +278,9 @@ def get_vectorstore(text_chunks, api_key, batch_size=32, pause=1.5):
 
 
 
-    texts = [doc.page_content for doc in text_chunks]
-    metadatas = [doc.metadata for doc in text_chunks]
-    return FAISS.from_texts(texts=texts, embedding=embeddings, metadatas=metadatas)
+    # texts = [doc.page_content for doc in text_chunks]
+    # metadatas = [doc.metadata for doc in text_chunks]
+    # return FAISS.from_texts(texts=texts, embedding=embeddings, metadatas=metadatas)
 
 # vectorstore = get_vectorstore(
 #     chunks, openai_api_key,

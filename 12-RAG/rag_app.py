@@ -138,19 +138,14 @@ def main():
             with st.chat_message("user"):
                 st.markdown(query)
 
-            with st.chat_message("assistant"):
-                with st.spinner("답변 생성 중..."):
-                    try:
-                        response = st.session_state.conversation.invoke(
-                            {"question": query}
-                        )
-                    except Exception as e:
-                        response = f"오류가 발생했습니다: {e}"
-                    st.markdown(response)
+            with st.spinner("답변 생성 중..."):
+                try:
+                    response = st.session_state.conversation.invoke({"question": query})
+                except Exception as e:
+                    response = f"오류가 발생했습니다: {e}"
 
-                st.session_state.chat_history.append(
-                    {"question": query, "answer": response}
-                )
+            st.session_state.chat_history.append({"question": query, "answer": response})
+            st.rerun()  # (구버전 Streamlit이면 st.experimental_rerun())
 
 
 

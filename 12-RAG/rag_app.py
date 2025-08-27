@@ -24,7 +24,7 @@ from langchain_community.vectorstores import FAISS
 
 def main():
     st.set_page_config(page_title="MultiQuery RAG", page_icon="📚")
-    st.title("_MultiQuery 기반 :red[문서 QA]_ 📚")
+    st.title("소리소리AI - 문서기반 AI검색기")
 
     with st.sidebar:
         uploaded_files = st.file_uploader(
